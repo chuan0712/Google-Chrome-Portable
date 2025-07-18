@@ -42,11 +42,15 @@ jobs:
         run: |
           echo "Listing files in build/release/"
           ls -al build/release/  # 确保文件存在
+      - name: create a compressed zip archive
+        run: |
+          # 创建一个zip压缩包,名称为 ${BUILD_NAME}.zip
+          zip -r "${{ env.BUILD_NAME }}.zip" build/release/*
       - name: create GitHub release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: $TAG_NAME  # 将创建的 Git 标签作为 Release 的 tag_name
           name: ${{ env.BUILD_NAME }}  # 将标签作为 Release 名称
-          files: build/release/*  # 包含你的构建文件的路径
+          files: ${{ env.BUILD_NAME }}.zip  # 上传压缩包
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
