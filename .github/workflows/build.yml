@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    tags: # 添加此行，以便在推送标签时触发发布
+      - 'Win64_*' # 匹配以 'Win64_' 开头的标签，例如 Win64_138.0.7204.101_2025-07-14
   pull_request:
     branches: [ main ]
   schedule:
@@ -21,10 +23,29 @@ jobs:
       - name: prepare env
         run: |
           python3 -m pip install -r requirements.txt
-          python3 run.py
-      - name: upload
+          python3 run.py # 假设 run.py 会在 build/release/ 目录下生成产物
+      - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BUILD_NAME }}
           path: build/release/*
           retention-days: 15
+
+      - name: Create Release # 新增的步骤：创建 GitHub Release
+        uses: softprops/action-gh-release@v1
+        # 只有在推送标签时才运行此步骤
+        # github.ref_name 会是标签的名称，例如 "Win64_138.0.7204.101_2025-07-14"
+        if: startsWith(github.ref, 'refs/tags/Win64_')
+        with:
+          # files: 指定要上传到 Release 的文件。这里我们上传 build/release/ 目录下的所有内容
+          files: build/release/*
+          # name: Release 的名称，使用标签名称作为版本
+          name: Google Chrome Portable ${{ github.ref_name }}
+          # tag_name: Release 关联的标签名称
+          tag_name: ${{ github.ref_name }}
+          # body: Release 的描述信息
+          body: |
+            Google Chrome Portable 版本 ${{ github.ref_name }}
+            此版本通过 GitHub Actions 自动构建。
+          # draft: true # 如果您想先创建草稿 Release，可以取消注释此行
+          # prerelease: true # 如果是预发布版本，可以取消注释此行
