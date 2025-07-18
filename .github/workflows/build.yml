@@ -3,9 +3,7 @@ name: build
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
-    tags: # 添加此行，以便在推送标签时触发发布
-      - 'Win64_*' # 匹配以 'Win64_' 开头的标签，例如 Win64_138.0.7204.101_2025-07-14
+    branches: [ main ] # 移除 tags 触发器，因为标签将在工作流内部创建
   pull_request:
     branches: [ main ]
   schedule:
@@ -24,6 +22,33 @@ jobs:
         run: |
           python3 -m pip install -r requirements.txt
           python3 run.py # 假设 run.py 会在 build/release/ 目录下生成产物
+          # 假设 run.py 会在 build/release/ 目录下生成一个名为 'chrome_version.txt' 的文件
+          # 包含类似 '138.0.7204.101' 的内容。如果 run.py 不生成，下面的步骤会使用备用版本号。
+      
+      - name: Generate Tag Name # 新增步骤：生成标签名称
+        id: generate_tag # 为此步骤添加 ID，以便后续步骤可以访问其输出
+        run: |
+          # 获取当前日期，格式为 YYYY-MM-DD
+          BUILD_DATE=$(date +%Y-%m-%d)
+          
+          # 尝试从 'build/release/chrome_version.txt' 文件中读取 Chrome 版本号
+          # 这是一个假设，您的 run.py 脚本可能需要将版本号写入此文件
+          if [ -f "build/release/chrome_version.txt" ]; then
+            CHROME_VERSION=$(cat build/release/chrome_version.txt)
+          else
+            # 如果文件不存在，则使用日期和 GitHub Actions 的运行号作为备用版本号
+            # 格式为 YYYY.MM.DD.RUN_NUMBER，确保唯一性
+            echo "Warning: 'build/release/chrome_version.txt' not found. Using fallback version."
+            CHROME_VERSION="$(date +%Y.%m.%d).${{ github.run_number }}"
+          fi
+          
+          # 构建完整的标签名称，例如：Win64_138.0.7204.101_2025-07-14
+          TAG_NAME="Win64_${CHROME_VERSION}_${BUILD_DATE}"
+          
+          echo "Generated tag name: $TAG_NAME"
+          # 将生成的标签名称设置为此步骤的输出，供后续步骤使用
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+
       - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -31,21 +56,19 @@ jobs:
           path: build/release/*
           retention-days: 15
 
-      - name: Create Release # 新增的步骤：创建 GitHub Release
+      - name: Create Release # 修改后的步骤：创建 GitHub Release
         uses: softprops/action-gh-release@v1
-        # 只有在推送标签时才运行此步骤
-        # github.ref_name 会是标签的名称，例如 "Win64_138.0.7204.101_2025-07-14"
-        if: startsWith(github.ref, 'refs/tags/Win64_')
+        # 只有在推送到 main 分支或定时任务触发时才运行此步骤
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule'
         with:
-          # files: 指定要上传到 Release 的文件。这里我们上传 build/release/ 目录下的所有内容
-          files: build/release/*
-          # name: Release 的名称，使用标签名称作为版本
-          name: Google Chrome Portable ${{ github.ref_name }}
-          # tag_name: Release 关联的标签名称
-          tag_name: ${{ github.ref_name }}
+          files: build/release/* # 指定要上传到 Release 的文件
+          # name: Release 的名称，使用上一步生成的标签名称
+          name: Google Chrome Portable ${{ steps.generate_tag.outputs.TAG_NAME }}
+          # tag_name: Release 关联的标签名称。如果此标签不存在，此 Action 会自动创建它。
+          tag_name: ${{ steps.generate_tag.outputs.TAG_NAME }}
           # body: Release 的描述信息
           body: |
-            Google Chrome Portable 版本 ${{ github.ref_name }}
+            Google Chrome Portable 版本 ${{ steps.generate_tag.outputs.TAG_NAME }}
             此版本通过 GitHub Actions 自动构建。
           # draft: true # 如果您想先创建草稿 Release，可以取消注释此行
           # prerelease: true # 如果是预发布版本，可以取消注释此行
