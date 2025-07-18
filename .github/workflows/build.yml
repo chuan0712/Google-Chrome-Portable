@@ -25,7 +25,7 @@ jobs:
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifact
+          name: ${{ env.BUILD_NAME }}
           path: build/release/*
           retention-days: 15
       - name: configure git user
@@ -54,8 +54,8 @@ jobs:
       - name: create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: $TAG_NAME  # 将创建的 Git 标签作为 Release 的 tag_name
-          name: $TAG_NAME      # 将标签作为 Release 名称
+          tag_name: $TAG_NAME  # 使用标签作为 Release 的 tag_name
+          name: ${{ env.BUILD_NAME }}  # 设置 Release 名称
           files: "${{ env.BUILD_NAME }}.zip"  # 确保只上传压缩包文件
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
