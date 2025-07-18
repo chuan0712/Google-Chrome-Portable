@@ -21,41 +21,65 @@ jobs:
       - name: prepare env
         run: |
           python3 -m pip install -r requirements.txt
-          python3 run.py
-      - name: upload artifacts
+          python3 run.py # 假设 run.py 会在 build/release/ 目录下生成产物
+          # 假设 run.py 会在 build/release/ 目录下生成一个名为 'chrome_version.txt' 的文件
+          # 包含类似 '138.0.7204.101' 的内容。
+      
+      - name: Generate Tag Name # 重新引入：生成标签名称 (更灵活和健壮的逻辑)
+        id: generate_tag # 为此步骤添加 ID，以便后续步骤可以访问其输出
+        run: |
+          # 获取当前日期，格式为 YYYY-MM-DD
+          BUILD_DATE=$(date +%Y-%m-%d)
+          
+          # 直接从 'build/release/chrome_version.txt' 文件中读取 Chrome 版本号
+          # 确保 run.py 脚本在此之前已将版本号写入此文件
+          CHROME_VERSION=$(cat build/release/chrome_version.txt)
+          
+          # 构建完整的标签名称，例如：Win64_138.0.7204.101_2025-07-14
+          TAG_NAME="Win64_${CHROME_VERSION}_${BUILD_DATE}"
+          
+          echo "Generated tag name: $TAG_NAME"
+          # 将生成的标签名称设置为此步骤的输出，供后续步骤使用
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Debug - List build/release contents before Release # 调试步骤：在发布前列出 build/release 目录内容
+        run: |
+          echo "Listing contents of build/release/ directory right before Release creation:"
+          ls -R build/release/ || echo "build/release/ directory is empty or does not exist at this stage."
+
+      - name: upload artifact # 上传工作流产物，用于调试和临时存储
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifact
+          name: ${{ env.BUILD_NAME }}
           path: build/release/*
           retention-days: 15
-      - name: configure git user
+
+      # 删除了多余的 'download artifacts' 步骤
+
+      - name: Create Git Tag and Push # 重新引入：创建 Git Tag 步骤 (包含 Git 配置和条件判断)
+        # 只有在推送到 main 分支或定时任务触发时才运行此步骤
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule'
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-      - name: create Git tag
-        run: |
-          # 自动创建标签，使用当前日期和时间作为版本号
-          TAG_NAME="v$(date +'%Y.%m.%d.%H%M')"
-          git tag -a $TAG_NAME -m "Release $TAG_NAME"
-          git push origin $TAG_NAME
-      - name: list files in build/release/
-        run: |
-          echo "Listing files in build/release/"
-          ls -al build/release/  # 确保文件存在
-      - name: create a compressed zip archive
-        run: |
-          # 创建一个zip压缩包,名称为 ${BUILD_NAME}.zip
-          zip -r "${{ env.BUILD_NAME }}.zip" build/release/*
-      - name: list files in the current directory (debugging step)
-        run: |
-          # 确认生成的压缩包是否存在
-          echo "Listing files in the current directory:"
-          ls -al
-      - name: create GitHub release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: $TAG_NAME  # 将创建的 Git 标签作为 Release 的 tag_name
-          name: $TAG_NAME      # 将标签作为 Release 名称
-          files: ${{ env.BUILD_NAME }}.zip  # 上传压缩包
+          TAG_NAME="${{ steps.generate_tag.outputs.TAG_NAME }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 确保有权限推送标签
+
+      - name: Create GitHub Release # 重新引入：创建 GitHub Release 步骤 (包含所有关键参数和条件判断)
+        uses: softprops/action-gh-release@v1
+        # 只有在推送到 main 分支或定时任务触发时才运行此步骤
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'schedule'
+        with:
+          # files: 使用递归通配符，确保包含 build/release/ 目录下所有子目录中的文件
+          files: build/release/*
+          # name: Release 的名称，使用上一步生成的标签名称，保持一致性
+          name: ${{ steps.generate_tag.outputs.TAG_NAME }}
+          # tag_name: 关键参数！确保 Release 关联到正确的标签
+          tag_name: ${{ steps.generate_tag.outputs.TAG_NAME }}
+          # draft: true # 如果您想先创建草稿 Release，可以取消注释此行
+          # prerelease: true # 如果是预发布版本，可以取消注释此行
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 确保有权限创建 Release
