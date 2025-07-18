@@ -38,11 +38,15 @@ jobs:
           TAG_NAME="v$(date +'%Y.%m.%d.%H%M')"
           git tag -a $TAG_NAME -m "Release $TAG_NAME"
           git push origin $TAG_NAME
+      - name: list files in build/release/
+        run: |
+          echo "Listing files in build/release/"
+          ls -al build/release/  # 确保文件存在
       - name: create GitHub release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: $TAG_NAME  # 将创建的 Git 标签作为 Release 的 tag_name
-          name: ${{ env.BUILD_NAME }} # 将标签作为 Release 名称
-          files: build/release/**/*  # 包含你的构建文件的路径
+          name: ${{ env.BUILD_NAME }}  # 将标签作为 Release 名称
+          files: build/release/*  # 包含你的构建文件的路径
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
