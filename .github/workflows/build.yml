@@ -41,7 +41,8 @@ jobs:
       - name: create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          name: ${{ env.BUILD_NAME }}
-          files: build/release/* # 包含你的构建文件的路径
+          tag_name: $TAG_NAME  # 将创建的 Git 标签作为 Release 的 tag_name
+          name: ${{ env.BUILD_NAME }} # 将标签作为 Release 名称
+          files: build/release/*  # 包含你的构建文件的路径
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
