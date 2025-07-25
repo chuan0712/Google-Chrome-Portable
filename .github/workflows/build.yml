@@ -58,16 +58,16 @@ jobs:
           git tag -a "$VERSION" -m "Release $VERSION"
           git push origin "$VERSION"
 
-      # 打包所有构建内容为 zip（固定为 chrome.zip）
+      # 打包所有构建内容为 zip（固定为 Chrome.zip）
       - name: zip release
         run: |
           cd build/release
-          zip -r ../../chrome.zip *
+          zip -r ../../Chrome.zip *
           cd ../..
 
       # 确认压缩包存在（可调试）
       - name: check zip file
-        run: ls -lh chrome.zip
+        run: ls -lh Chrome.zip
 
       # 上传到 GitHub Releases
       - name: create GitHub release
@@ -75,6 +75,6 @@ jobs:
         with:
           tag_name: ${{ steps.versioning.outputs.tag_name }}  # 使用版本号作为 tag
           name: ${{ env.BUILD_NAME }}  # Release 名称显示构建名
-          files: chrome.zip  # 仅上传 chrome.zip
+          files: Chrome.zip  # 仅上传 Chrome.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 默认提供的 token，用于发布权限
