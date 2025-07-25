@@ -12,50 +12,50 @@ on:
 jobs:
   Warp_Chrome:
     runs-on: ubuntu-latest
+    env:
+      TAG_NAME: v${{ github.run_id }}-${{ github.run_number }}
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4.7.1
         with:
           python-version: '3.10'
-      - run: ls
-      - name: prepare env
+
+      - name: Show working directory
+        run: ls
+
+      - name: Prepare environment
         run: |
           python3 -m pip install -r requirements.txt
           python3 run.py
-      - name: upload artifacts
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BUILD_NAME }}
           path: build/release/*
           retention-days: 15
-      - name: configure git user
+
+      - name: Configure Git user
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-      - name: create Git tag
+
+      - name: Create Git tag
         run: |
-          # 自动创建标签，使用当前日期和时间作为版本号
-          TAG_NAME="v$(date +'%Y.%m.%d.%H%M')"
-          git tag -a $TAG_NAME -m "Release $TAG_NAME"
-          git push origin $TAG_NAME
-      - name: list files in build/release/
+          git tag -a "${{ env.TAG_NAME }}" -m "Release ${{ env.TAG_NAME }}"
+          git push origin "${{ env.TAG_NAME }}"
+
+      - name: Zip build output
         run: |
-          echo "Listing files in build/release/"
-          ls -al build/release/  # 确保文件存在
-      - name: create a compressed zip archive
-        run: |
-          # 创建一个zip压缩包,名称为 ${BUILD_NAME}.zip
           zip -r "${{ env.BUILD_NAME }}.zip" build/release/*
-      - name: list files in the current directory (debugging step)
-        run: |
-          # 确认生成的压缩包是否存在
-          echo "Listing files in the current directory:"
-          ls -al
-      - name: create GitHub release
+
+      - name: Upload release to GitHub
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: $TAG_NAME  # 使用标签作为 Release 的 tag_name
-          name: ${{ env.BUILD_NAME }}  # 设置 Release 名称
-          files: "${{ env.BUILD_NAME }}.zip"  # 确保只上传压缩包文件
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.BUILD_NAME }}
+          files: "${{ env.BUILD_NAME }}.zip"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
