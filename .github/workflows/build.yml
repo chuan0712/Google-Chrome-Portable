@@ -1,20 +1,19 @@
 name: build
 
 on:
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
   push:
-    branches: [ main ]  # 当 main 分支有 push 时触发
+    branches: [ main ]
   pull_request:
-    branches: [ main ]  # PR 合并到 main 时触发
+    branches: [ main ]
   schedule:
-    - cron: "0 8 * * 1"  # 每周一 8:00 UTC 自动运行（北京时间 16:00）
+    - cron: "0 8 * * 1"
 
 jobs:
   Warp_Chrome:
-    runs-on: ubuntu-latest  # 使用 Ubuntu 最新 runner
-
+    runs-on: ubuntu-latest
     steps:
-      # 检出仓库代码
+      # 拉取代码
       - uses: actions/checkout@v4
 
       # 设置 Python 环境
@@ -22,59 +21,55 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 可选：查看目录内容，调试用
-      - run: ls
+      # 打印项目结构
+      - name: Show files
+        run: ls -al
 
-      # 安装依赖并运行构建脚本
-      - name: prepare env
+      # 安装依赖并运行脚本
+      - name: Prepare environment
         run: |
           python3 -m pip install -r requirements.txt
           python3 run.py
 
-      # 上传构建产物到 Actions 的 Artifacts（可供调试下载）
-      - name: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.BUILD_NAME }}
-          path: build/release/*
-          retention-days: 15
-
-      # 配置 git 用户信息（用于后续创建 tag）
-      - name: configure git user
+      # 设置 Git 身份（用于 tag）
+      - name: Configure git user
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      # 自动从版本中提取 tag（如 138.0.7204.169）
-      - name: extract version and create tag
+      # 提取版本号并创建 tag（如未存在）
+      - name: Extract version and create tag
         id: versioning
         run: |
-          # 提取版本号
           VERSION=$(echo "${{ env.BUILD_NAME }}" | grep -oP '\d+\.\d+\.\d+\.\d+')
+          echo "VERSION=$VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "tag_name=$VERSION" >> $GITHUB_OUTPUT
 
-          # 创建 Git 标签并推送
-          git tag -a "$VERSION" -m "Release $VERSION"
-          git push origin "$VERSION"
+          if git ls-remote --tags origin | grep -q "refs/tags/$VERSION"; then
+            echo "⚠️ Tag $VERSION already exists. Skipping release step."
+            echo "SKIP_RELEASE=true" >> $GITHUB_ENV
+          else
+            git tag -a "$VERSION" -m "Release $VERSION"
+            git push origin "$VERSION"
+          fi
 
-      # 打包所有构建内容为 zip（固定为 Chrome.zip）
-      - name: zip release
+      # 打包为 Chrome.zip
+      - name: Create zip archive
         run: |
           cd build/release
           zip -r ../../Chrome.zip *
-          cd ../..
+          cd ../../
+          echo "Zip created:"
+          ls -al Chrome.zip
 
-      # 确认压缩包存在（可调试）
-      - name: check zip file
-        run: ls -lh Chrome.zip
-
-      # 上传到 GitHub Releases
-      - name: create GitHub release
+      # 创建 GitHub Release，仅在 tag 不存在时执行
+      - name: Create GitHub release
+        if: env.SKIP_RELEASE != 'true'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.versioning.outputs.tag_name }}  # 使用版本号作为 tag
-          name: ${{ env.BUILD_NAME }}  # Release 名称显示构建名
-          files: Chrome.zip  # 仅上传 Chrome.zip
+          tag_name: ${{ steps.versioning.outputs.tag_name }}
+          name: ${{ env.BUILD_NAME }}
+          files: Chrome.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 默认提供的 token，用于发布权限
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
