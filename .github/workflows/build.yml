@@ -13,18 +13,63 @@ jobs:
   Warp_Chrome:
     runs-on: ubuntu-latest
     steps:
+      # 拉取代码
       - uses: actions/checkout@v4
+
+      # 设置 Python 环境
       - uses: actions/setup-python@v4.7.1
         with:
           python-version: '3.10'
-      - run: ls
-      - name: prepare env
+
+      # 打印项目结构
+      - name: Show files
+        run: ls -al
+
+      # 安装依赖并运行脚本
+      - name: Prepare environment
         run: |
           python3 -m pip install -r requirements.txt
           python3 run.py
-      - name: upload
-        uses: actions/upload-artifact@v4
+
+      # 设置 Git 身份（用于 tag）
+      - name: Configure git user
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      # 提取版本号并创建 tag（如未存在）
+      - name: Extract version and create tag
+        id: versioning
+        run: |
+          VERSION=$(echo "${{ env.BUILD_NAME }}" | grep -oP '\d+\.\d+\.\d+\.\d+')
+          echo "VERSION=$VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "tag_name=$VERSION" >> $GITHUB_OUTPUT
+
+          if git ls-remote --tags origin | grep -q "refs/tags/$VERSION"; then
+            echo "⚠️ Tag $VERSION already exists. Skipping release step."
+            echo "SKIP_RELEASE=true" >> $GITHUB_ENV
+          else
+            git tag -a "$VERSION" -m "Release $VERSION"
+            git push origin "$VERSION"
+          fi
+
+      # 打包为 Chrome.zip
+      - name: Create zip archive
+        run: |
+          cd build/release
+          zip -r ../../Chrome.zip *
+          cd ../../
+          echo "Zip created:"
+          ls -al Chrome.zip
+
+      # 创建 GitHub Release，仅在 tag 不存在时执行
+      - name: Create GitHub release
+        if: env.SKIP_RELEASE != 'true'
+        uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.versioning.outputs.tag_name }}
           name: ${{ env.BUILD_NAME }}
-          path: build/release/*
-          retention-days: 15
+          files: Chrome.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
