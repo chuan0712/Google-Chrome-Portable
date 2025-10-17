@@ -13,8 +13,7 @@ jobs:
   Warp_Chrome:
     runs-on: ubuntu-latest
     steps:
-      # 拉取代码
-      - uses: actions/checkout@v4
+      # ... (前面步骤保持不变) ...
 
       # 设置 Python 环境
       - uses: actions/setup-python@v4.7.1
@@ -63,14 +62,14 @@ jobs:
           echo "Zip created:"
           ls -al Chrome.zip
 
-      # 新增步骤：计算 Chrome.zip 的 MD5 并写入 md5.txt
-      - name: Create MD5 checksum file
+      # 🚨 关键更改：计算 Chrome.zip 的 SHA-256 并写入 sha256.txt
+      - name: Create SHA-256 checksum file
         run: |
-          # 使用 md5sum 计算 Chrome.zip 的 MD5，并将结果重定向到 md5.txt
-          md5sum Chrome.zip > md5.txt
-          echo "MD5 checksum created:"
-          cat md5.txt
-          ls -al md5.txt
+          # 使用 sha256sum 计算 Chrome.zip 的哈希值，并将结果重定向到 sha256.txt
+          sha256sum Chrome.zip > sha256.txt
+          echo "SHA-256 checksum created:"
+          cat sha256.txt
+          ls -al sha256.txt
 
       # 创建 GitHub Release，仅在 tag 不存在时执行
       - name: Create GitHub release
@@ -79,9 +78,9 @@ jobs:
         with:
           tag_name: ${{ steps.versioning.outputs.tag_name }}
           name: ${{ env.BUILD_NAME }}
-          # 🚨 更改这里：同时包含 Chrome.zip 和 md5.txt
+          # 🚨 更改这里：同时包含 Chrome.zip 和 sha256.txt
           files: |
             Chrome.zip
-            md5.txt
+            sha256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
