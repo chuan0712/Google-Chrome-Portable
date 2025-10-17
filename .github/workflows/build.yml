@@ -63,11 +63,14 @@ jobs:
           echo "Zip created:"
           ls -al Chrome.zip
 
-      # 计算 Chrome.zip 的 MD5 哈希并保存为 md5.txt
-      - name: Generate MD5 hash
+      # 新增步骤：计算 Chrome.zip 的 MD5 并写入 md5.txt
+      - name: Create MD5 checksum file
         run: |
+          # 使用 md5sum 计算 Chrome.zip 的 MD5，并将结果重定向到 md5.txt
           md5sum Chrome.zip > md5.txt
+          echo "MD5 checksum created:"
           cat md5.txt
+          ls -al md5.txt
 
       # 创建 GitHub Release，仅在 tag 不存在时执行
       - name: Create GitHub release
@@ -76,8 +79,9 @@ jobs:
         with:
           tag_name: ${{ steps.versioning.outputs.tag_name }}
           name: ${{ env.BUILD_NAME }}
+          # 🚨 更改这里：同时包含 Chrome.zip 和 md5.txt
           files: |
             Chrome.zip
-            md5.txt  # 上传 md5 哈希文件
+            md5.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
