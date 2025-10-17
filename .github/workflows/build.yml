@@ -13,7 +13,8 @@ jobs:
   Warp_Chrome:
     runs-on: ubuntu-latest
     steps:
-      # ... (前面步骤保持不变) ...
+      # 拉取代码
+      - uses: actions/checkout@v4
 
       # 设置 Python 环境
       - uses: actions/setup-python@v4.7.1
