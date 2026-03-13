@@ -31,17 +31,19 @@ jobs:
           python3 -m pip install requests
           python3 run.py
 
-      # 使用 7zzs 进行极限压缩
-      # -mx=9 表示最高压缩等级
+# 修改压缩步骤：进入目录并执行压缩，避免路径层级问题
       - name: Compress Release Package (7z)
         run: |
           chmod +x ./7zzs
-          ./7zzs a -mx=9 "build/release/${{ env.BUILD_NAME }}.7z" ./Chrome
+          # 直接在 build/release 目录下操作，确保能找到 Chrome 文件夹
+          cd build/release
+          ../../7zzs a -mx=9 "${{ env.BUILD_NAME }}.7z" ./Chrome
 
       - name: Upload Artifact (Backup)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BUILD_NAME }}
+          # 修正路径
           path: build/release/${{ env.BUILD_NAME }}.7z
           retention-days: 15
 
