@@ -16,48 +16,34 @@ jobs:
   Warp_Chrome:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v4.7.1
         with:
           python-version: '3.10'
 
-      - name: Prepare build directory
-        run: mkdir -p build/release
+      - name: Install Dependencies
+        run: pip install requests
 
       - name: Run Build Script
-        run: |
-          python3 -m pip install requests
-          python3 run.py
-
-# 修改压缩步骤：进入目录并执行压缩，避免路径层级问题
-      - name: Compress Release Package (7z)
-        run: |
-          chmod +x ./7zzs
-          # 直接在 build/release 目录下操作，确保能找到 Chrome 文件夹
-          cd build/release
-          ../../7zzs a -mx=9 "${{ env.BUILD_NAME }}.7z" ./Chrome
-
-      - name: Upload Artifact (Backup)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.BUILD_NAME }}
-          # 修正路径
-          path: build/release/${{ env.BUILD_NAME }}.7z
-          retention-days: 15
+        run: python3 run.py
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.event_name != 'pull_request'
         with:
-          tag_name: ${{ env.BUILD_NAME }}
-          name: Chrome Portable ${{ env.BUILD_NAME }}
+          # 使用 Python 脚本中定义的 v$version
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           body: |
-            自动构建的 Chrome 便携版 (7z 高压缩格式)。
-            版本号: ${{ env.BUILD_NAME }}
+            Automated Build of Chrome Portable.
+            Version: ${{ env.RELEASE_TAG }}
+            Build Date: ${{ github.event.head_commit.timestamp }}
           draft: false
           prerelease: false
-          files: build/release/${{ env.BUILD_NAME }}.7z
+          # 上传固定文件名的 7z 包
+          files: ${{ env.ARCHIVE_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
